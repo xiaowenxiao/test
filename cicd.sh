@@ -1,7 +1,8 @@
 #!/bin/bash
+#此脚本软链接或拷贝到/usr/local/bin, 直接使用
+#basepath=$(cd `dirname $0`; pwd)/$(basename $0)
 set -e 
 
-basepath=$(cd `dirname $0`; pwd)/$(basename $0)
 TimeTag=$(date +"%Y-%m-%d-%H-%M-%S")
 release_time=10s
 
@@ -39,7 +40,8 @@ main() {
 }
 
 Usage() {
-    echo -e "Usage: bash ${basepath} -o [ProjName] -r [Docker_Registry_url]\n
+    #echo -e "Usage: bash ${basepath} -o [ProjName] -r [Docker_Registry_url]\n
+    echo -e "Usage: cicd -o [ProjName] -r [Docker_Registry_url]\n
     -o [ProjName] (Required) \n
     -r [Docker_Registry_url] (Required)\n
     -f [Config] Name of the Dockerfile (Optional,Default is 'PATH/Dockerfile')\n 
@@ -76,8 +78,8 @@ done
 
 [ ! ${proj} ] && Usage
 [ ! ${registry} ] && Usage
-[ ! ${config} ] && config=$(cd `dirname $0`; pwd)/Dockerfile
-[ ! ${BuildDir} ] && BuildDir=$(cd `dirname $0`; pwd)
+[ ! ${config} ] && config=$(pwd)/Dockerfile
+[ ! ${BuildDir} ] && BuildDir=$(pwd)
 [ ! ${namespace} ] && namespace="default"
 
 cat <<  EOF > ./index.html
