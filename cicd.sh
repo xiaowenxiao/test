@@ -1,5 +1,4 @@
 #!/bin/bash
-#此脚本软链接或拷贝到/usr/local/bin, 直接使用
 #basepath=$(cd `dirname $0`; pwd)/$(basename $0)
 set -e 
 
