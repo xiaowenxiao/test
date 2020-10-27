@@ -1,435 +1,435 @@
-＃适用于Kubernetes的ONLYOFFICE DocumentServer
+# ONLYOFFICE DocumentServer for Kubernetes
 
-该存储库包含一组文件，用于将ONLYOFFICE DocumentServer部署到Kubernetes集群中。
+This repository contains a set of files to deploy ONLYOFFICE DocumentServer into Kubernetes cluster.
 
-＃＃ 介绍
+## Introduction
 
--您必须安装Kubernetes。请检查[参考]（https://kubernetes.io/docs/setup/）来设置Kubernetes。
--您还应该具有本地配置的`kubectl`副本。请参阅[this]（https://kubernetes.io/docs/tasks/tools/install-kubectl/）指南，了解如何安装和配置`kubectl`。
--您应该安装Helm v3，请按照[此处]（https://helm.sh/docs/intro/install/）的说明进行安装。
+- You must have Kubernetes installed. Please, checkout [the reference](https://kubernetes.io/docs/setup/) to setup a Kubernetes.
+- You should also have a local configured copy of `kubectl`. See [this](https://kubernetes.io/docs/tasks/tools/install-kubectl/) guide how to install and configure `kubectl`.
+- You should install Helm v3, please follow the instruction [here](https://helm.sh/docs/intro/install/) to install it.
 
-##部署先决条件
+## Deploy prerequisites
 
-### 1.安装永久性存储
+### 1. Install Persistent Storage
 
-安装NFS服务器预配器
+Install NFS Server Provisioner
 
-``
-$ helm install nfs-server stable / nfs-server-provisioner \
-  --set persistence.enabled = true \
-  --set persistence.storageClass = PERSISTENT_STORAGE_CLASS \
-  --set persistence.size = PERSISTENT_SIZE
+```bash
+$ helm install nfs-server stable/nfs-server-provisioner \
+  --set persistence.enabled=true \
+  --set persistence.storageClass=PERSISTENT_STORAGE_CLASS \
+  --set persistence.size=PERSISTENT_SIZE
 ```
 
--`PERSISTENT_STORAGE_CLASS`是您的Kubernetes集群中可用的持久性存储类
+- `PERSISTENT_STORAGE_CLASS` is Persistent Storage Class available in your Kubernetes cluster
 
-  不同提供商的持久性存储类：
-  -亚马逊EKS：`gp2`
-  -Digital Ocean：`do-block-storage`
-  -IBM Cloud：缺省`ibmc-file-bronze`。[更多存储类]（https://cloud.ibm.com/docs/containers?topic=containers-file_storage）
-  -Yandex Cloud：“ yc-network-hdd”或“ yc-network-ssd”。[更多详细信息]（https://cloud.yandex.ru/docs/managed-kubernetes/operations/volumes/manage-storage-class）
-  -minikube：“标准”
+  Persistent Storage Classes for different providers:
+  - Amazon EKS: `gp2`
+  - Digital Ocean: `do-block-storage`
+  - IBM Cloud: Default `ibmc-file-bronze`. [More storage classes](https://cloud.ibm.com/docs/containers?topic=containers-file_storage)
+  - Yandex Cloud: `yc-network-hdd` or `yc-network-ssd`. [More details](https://cloud.yandex.ru/docs/managed-kubernetes/operations/volumes/manage-storage-class)
+  - minikube: `standard`
 
--“ PERSISTENT_SIZE”是nfs持久存储类的所有持久存储的总大小。您可以将大小表示为以下后缀中的一个整数：`T`，`G`，`M`，`Ti`，`Gi`，`Mi`。例如：`8Gi`。
+- `PERSISTENT_SIZE` is the total size of all Persistent Storages for nfs Persistent Storage Class. You can express size as a plain integer one of these suffixes: `T`, `G`, `M`, `Ti`, `Gi`, `Mi`. For example: `8Gi`.
 
-在Helm [此处]（https://github.com/helm/charts/tree/master/stable/nfs-server-provisioner#nfs-server-provisioner）上查看有关安装NFS Server Provisioner的更多详细信息。
+See more detail about install NFS Server Provisioner via Helm [here](https://github.com/helm/charts/tree/master/stable/nfs-server-provisioner#nfs-server-provisioner).
 
-创建持久卷声明
+Create Persistent Volume Claim
 
-``
+```bash
 $ kubectl apply -f ./pvc/ds-files.yaml
 ```
 
-注意：默认的“ nfs”持久卷声明为8Gi。您可以在“ spec.resources.requests.storage”部分的“ ./pvc/ds-files.yaml”文件中进行更改。至少应比“ PERSISTENT_SIZE”小5％左右。对于ONLYOFFICE DocumentServer的每100个活动用户，建议永久使用8Gi或更高的存储空间。
+Note: Default `nfs` Persistent Volume Claim is 8Gi. You can change it in `./pvc/ds-files.yaml` file in `spec.resources.requests.storage` section. It should be less than `PERSISTENT_SIZE` at least by about 5%. Recommended use 8Gi or more for persistent storage for every 100 active users of ONLYOFFICE DocumentServer.
 
-验证`ds-files`状态
+Verify `ds-files` status
 
-``
-$ kubectl获取pvc ds文件
+```bash
+$ kubectl get pvc ds-files
 ```
 
-输出量
+Output
 
 ```
-名称状态容量能力访问模式存储分类年龄
-ds-files Bound pvc-XXXXXXXX-XXXXXXXXX-XXXX-XXXXXXXXXXXX 8Gi RWX nfs 1m
+NAME       STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+ds-files   Bound    pvc-XXXXXXXX-XXXXXXXXX-XXXX-XXXXXXXXXXXX   8Gi        RWX            nfs            1m
 ```
 
-### 2.部署RabbitMQ
+### 2. Deploy RabbitMQ
 
-要将RabbitMQ安装到您的集群，请运行以下命令：
+To install the RabbitMQ to your cluster, run the following command:
 
-``
-$舵机安装rabbitmq stable / rabbitmq
+```bash
+$ helm install rabbitmq stable/rabbitmq
 ```
-在此处[https://github.com/helm/charts/tree/master/stable/rabbitmq#rabbitmq）中查看有关通过Helm安装RabbitMQ的更多详细信息。
+See more detail about install RabbitMQ via Helm [here](https://github.com/helm/charts/tree/master/stable/rabbitmq#rabbitmq).
 
-### 3.部署Redis
+### 3. Deploy Redis
 
-要将Redis安装到您的集群，请运行以下命令：
+To install the Redis to your cluster, run the following command:
 
-``
-$ helm install redis稳定/ redis \
-  --set cluster.enabled = false \
-  --set usePassword = false
+```bash
+$ helm install redis stable/redis \
+  --set cluster.enabled=false \
+  --set usePassword=false
 ```
 
-在此处[https://github.com/helm/charts/tree/master/stable/redis#redis）中查看有关通过Helm安装Redis的更多详细信息。
+See more detail about install Redis via Helm [here](https://github.com/helm/charts/tree/master/stable/redis#redis).
 
-### 4.部署PostgreSQL
+### 4. Deploy PostgreSQL
 
-下载ONLYOFFICE DocumentServer数据库方案：
+Download ONLYOFFICE DocumentServer database scheme:
 
-``
+```bash
 wget https://raw.githubusercontent.com/ONLYOFFICE/server/master/schema/postgresql/createdb.sql
 ```
 
-从中创建配置图：
+Create a config map from it:
 
-``
-$ kubectl创建configmap init-db-scripts \
-  --from-file =。/ createdb.sql
+```bash
+$ kubectl create configmap init-db-scripts \
+  --from-file=./createdb.sql
 ```
 
-要将PostgreSQL安装到您的集群，请运行以下命令：
+To install the PostgreSQL to your cluster, run the following command:
 
 ```
-$ helm安装postgresql稳定版/ postgresql \
-  --set initdbScriptsConfigMap = init-db-scripts \
-  --set postgresqlDatabase = postgres \
-  --set persistence.size = PERSISTENT_SIZE
+$ helm install postgresql stable/postgresql \
+  --set initdbScriptsConfigMap=init-db-scripts \
+  --set postgresqlDatabase=postgres \
+  --set persistence.size=PERSISTENT_SIZE
 ```
 
-这里的“ PERSISTENT_SIZE”是PostgreSQL持久卷的大小。例如：`8Gi`。
+Here `PERSISTENT_SIZE` is a size for PostgreSQL persistent volume. For example: `8Gi`.
 
-建议对ONLYOFFICE DocumentServer的每100个活动用户至少使用2Gi的持久性存储。
+Recommended use at least 2Gi of persistent storage for every 100 active users of ONLYOFFICE DocumentServer.
 
-在此处[https://github.com/helm/charts/tree/master/stable/postgresql#postgresql）中查看有关通过Helm安装PostgreSQL的更多详细信息。
+See more detail about install PostgreSQL via Helm [here](https://github.com/helm/charts/tree/master/stable/postgresql#postgresql).
 
-### 5.部署StatsD
-*此步骤是可选的。如果您不想运行StatsD *，则可以完全跳过＃6步骤
+### 5. Deploy StatsD
+*This step is optional. You can skip #6 step at all if you don't wanna run StatsD*
 
-部署StatsD配置图：
+Deploy StatsD configmap:
 ```
 $ kubectl apply -f ./configmaps/statsd.yaml
 ```
-部署StatsD窗格：
+Deploy StatsD pod:
 ```
 $ kubectl apply -f ./pods/statsd.yaml
 ```
-部署`statsd`服务：
+Deploy `statsd` service:
 ```
 $ kubectl apply -f ./services/statsd.yaml
 ```
-在ONLYOFFICE DocumentServer中允许statsD指标：
+Allow statsD metrics in ONLYOFFICE DocumentServer:
 
-将./configmaps/documentserver.yaml文件中的`data.METRICS_ENABLED`字段设置为`“ true”`值
+Put `data.METRICS_ENABLED` field in ./configmaps/documentserver.yaml file to `"true"` value
 
-##部署ONLYOFFICE DocumentServer
+## Deploy ONLYOFFICE DocumentServer
 
-### 1.部署ONLYOFFICE DocumentServer许可证
+### 1. Deploy ONLYOFFICE DocumentServer license
 
--如果您具有有效的ONLYOFFICE DocumentServer许可证，请从文件中创建秘密的“许可证”。
+- If you have valid ONLYOFFICE DocumentServer license, create secret `license` from file.
 
-    ``
-    $ kubectl创建秘密通用许可证
-      --from-file =。/ license.lic
+    ```bash
+    $ kubectl create secret generic license \
+      --from-file=./license.lic
     ```
 
-    注意：源许可证文件名应为“ license.lic”，因为此名称将用作创建的机密中的字段。
+    Note: The source license file name should be 'license.lic' because this name would be used as a field in created secret.
 
--如果您没有ONLYOFFICE DocumentServer许可证，请使用以下命令创建空的秘密`license`：
+- If you have no ONLYOFFICE DocumentServer license, create empty secret `license` with follow command:
 
-    ``
-    $ kubectl创建秘密通用许可证
+    ```bash
+    $ kubectl create secret generic license
     ```
 
-### 2.部署ONOFFOFFICE DocumentServer参数
+### 2. Deploy ONLYOFFICE DocumentServer parameters
 
-部署DocumentServer configmap：
+Deploy DocumentServer configmap:
 
-``
+```bash
 $ kubectl apply -f ./configmaps/documentserver.yaml
 ```
 
-使用JWT参数创建`jwt`秘密
+Create `jwt` secret with JWT parameters
 
-``
-$ kubectl创建秘密的通用jwt
-  --from-literal = JWT_ENABLED = true \
-  --from-literal = JWT_SECRET = MYSECRET
+```bash
+$ kubectl create secret generic jwt \
+  --from-literal=JWT_ENABLED=true \
+  --from-literal=JWT_SECRET=MYSECRET
 ```
 
-“ MYSECRET”是用于验证对ONLYOFFICE文档服务器的请求中的JSON Web令牌的密钥。
+`MYSECRET` is the secret key to validate the JSON Web Token in the request to the ONLYOFFICE Document Server.
 
-### 3.部署DocumentServer
+### 3. Deploy DocumentServer
 
-部署`spellchecker`部署：
+Deploy `spellchecker` deployment:
 
-``
+```bash
 $ kubectl apply -f ./deployments/spellchecker.yaml
 ```
 
-使用以下命令验证“ spellchecker”部署是否正在运行所需数量的Pod。
+Verify that the `spellchecker` deployment is running the desired number of pods with the following command.
 
-``
-$ kubectl获取部署拼写检查器
+```bash
+$ kubectl get deployment spellchecker
 ```
 
-输出量
+Output
 
 ```
-姓名可用年龄
-拼写检查器2/2 2 2 1m
+NAME           READY   UP-TO-DATE   AVAILABLE   AGE
+spellchecker   2/2     2            2           1m
 ```
 
-部署拼写检查器服务：
+Deploy spellchecker service:
 
-``
+```bash
 $ kubectl apply -f ./services/spellchecker.yaml
 ```
 
-部署示例服务：
+Deploy example service:
 
-``
+```bash
 $ kubectl apply -f ./services/example.yaml
 ```
 
-部署docservice：
+Deploy docservice:
 
-``
+```bash
 $ kubectl apply -f ./services/docservice.yaml
 ```
 
-部署`docservice`部署：
+Deploy `docservice` deployment:
 
-``
+```bash
 $ kubectl apply -f ./deployments/docservice.yaml
 ```
 
-使用以下命令验证docservice部署是否正在运行所需数量的Pod。
+Verify that the `docservice` deployment is running the desired number of pods with the following command.
 
-``
-$ kubectl获取部署文档服务
+```bash
+$ kubectl get deployment docservice
 ```
 
-输出量
+Output
 
 ```
-姓名可用年龄
-docservice 2/2 2 2 1m
+NAME        READY   UP-TO-DATE   AVAILABLE   AGE
+docservice  2/2     2            2           1m
 ```
 
-部署`converter`部署：
+Deploy `converter` deployment:
 
-``
+```bash
 $ kubectl apply -f ./deployments/converter.yaml
 ```
 
-使用以下命令验证“转换器”部署是否正在运行所需数量的Pod。
+Verify that the `converter` deployment is running the desired number of pods with the following command.
 
-``
-$ kubectl获取部署转换器
+```bash
+$ kubectl get deployment converter
 ```
 
-输出量
+Output
 
 ```
-姓名可用年龄
-转换器2/2 2 2 1m
+NAME        READY   UP-TO-DATE   AVAILABLE   AGE
+converter   2/2     2            2           1m
 ```
 
-默认情况下，“ docservice”，“ converter”和“ spellchecker”部署由2个容器组成。
+`docservice`, `converter` and `spellchecker` deployments consist of 2 pods each other by default.
 
-要扩展docservice部署，请使用以下命令：
+To scale `docservice` deployment use follow command:
 
-``
-$ kubectl scale -n默认部署docservice --replicas = POD_COUNT
+```bash
+$ kubectl scale -n default deployment docservice --replicas=POD_COUNT
 ```
 
-其中POD_COUNT是docservice pod的数量
+where `POD_COUNT` is number of `docservice` pods
 
-可以按比例缩放`converter`和`spellchecker`部署：
+The same to scale `converter` and `spellchecker` deployment:
 
-``
-$ kubectl scale -n默认部署转换器--replicas = POD_COUNT
+```bash
+$ kubectl scale -n default deployment converter --replicas=POD_COUNT
 ```
 
-``
-$ kubectl scale -n默认部署拼写检查器--replicas = POD_COUNT
+```bash
+$ kubectl scale -n default deployment spellchecker --replicas=POD_COUNT
 ```
 
-### 4.部署DocumentServer示例（可选）
+### 4. Deploy DocumentServer Example (optional)
 
-*此步骤是可选的。如果您不想运行DocumentServer Example *，则可以完全跳过＃4步骤。
+*This step is optional. You can skip #4 step at all if you don't wanna run DocumentServer Example*
 
-部署示例configmap：
+Deploy example configmap:
 
-``
+```bash
 $ kubectl apply -f ./configmaps/example.yaml
 ```
 
-部署示例pod：
+Deploy example pod:
 
-``
+```bash
 $ kubectl apply -f ./pods/example.yaml
 ```
 
-### 5.公开DocumentServer
+### 5. Expose DocumentServer
 
-#### 5.1通过服务公开DocumentServer（仅HTTP）
-*如果要通过HTTPS公开DocumentServer，请跳过＃5.1步骤*
+#### 5.1 Expose DocumentServer via Service (HTTP Only)
+*You should skip #5.1 step if you are going expose DocumentServer via HTTPS*
 
-这种类型的暴露具有最低的性能开销，它创建了一个负载平衡器来访问DocumentServer。
-如果您使用外部TLS终止，并且在k8s集群中没有其他WEB应用程序，则使用这种类型的暴露。
+This type of exposure has the least overheads of performance, it creates a loadbalancer to get access to DocumentServer.
+Use this type of exposure if you use external TLS termination, and don't have another WEB application in k8s cluster.
 
-部署`documentserver`服务：
+Deploy `documentserver` service:
 
-``
+```bash
 $ kubectl apply -f ./services/documentserver-lb.yaml
 ```
 
-运行下一个命令以获取`documentserver`服务IP：
+Run next command to get `documentserver` service IP:
 
-``
-$ kubectl获取服务文件服务器-o jsonpath =“ {。status.loadBalancer.ingress [*]。ip}”
+```bash
+$ kubectl get service documentserver -o jsonpath="{.status.loadBalancer.ingress[*].ip}"
 ```
 
-之后，仅在http：// DOCUMENTSERVER-SERVICE-IP /上将提供ONLYOFFICE DocumentServer。
+After it ONLYOFFICE DocumentServer will be available at `http://DOCUMENTSERVER-SERVICE-IP/`.
 
-如果服务IP为空，请尝试获取`documentserver`服务主机名
+If service IP is empty try getting `documentserver` service hostname
 
-``
-kubectl获取服务文档服务器-o jsonpath =“ {。status.loadBalancer.ingress [*]。hostname}”
+```bash
+kubectl get service documentserver -o jsonpath="{.status.loadBalancer.ingress[*].hostname}"
 ```
 
-在这种情况下，只能从http：// DOCUMENTSERVER-SERVICE-HOSTNAME /获取ONLYOFFICE DocumentServer。
+In this case ONLYOFFICE DocumentServer will be available at `http://DOCUMENTSERVER-SERVICE-HOSTNAME/`.
 
 
-#### 5.2通过Ingress公开DocumentServer
+#### 5.2 Expose DocumentServer via Ingress
 
-#### 5.2.1安装Kubernetes Nginx入口控制器
+#### 5.2.1 Installing the Kubernetes Nginx Ingress Controller
 
-要将Nginx Ingress Controller安装到您的集群，请运行以下命令：
+To install the Nginx Ingress Controller to your cluster, run the following command:
 
-``
-$ helm install nginx-inress stable / nginx-ingress --set controller.publishService.enabled = true，controller.replicaCount = 2
+```bash
+$ helm install nginx-ingress stable/nginx-ingress --set controller.publishService.enabled=true,controller.replicaCount=2
 ```
 
-在[这里]（https://github.com/helm/charts/tree/master/stable/nginx-ingress#nginx-ingress）中查看有关通过Helm安装Nginx Ingress的更多详细信息。
+See more detail about install Nginx Ingress via Helm [here](https://github.com/helm/charts/tree/master/stable/nginx-ingress#nginx-ingress).
 
-部署`documentserver`服务：
+Deploy `documentserver` service:
 
-``
+```bash
 $ kubectl apply -f ./services/documentserver.yaml
 ```
 
-#### 5.2.2通过HTTP公开DocumentServer
+#### 5.2.2 Expose DocumentServer via HTTP
 
-*如果要通过HTTPS公开DocumentServer，请跳过＃5.2.2步骤*
+*You should skip #5.2.2 step if you are going expose DocumentServer via HTTPS*
 
-与通过服务进行公开相比，这种公开具有更多的性能开销，它还创建了一个负载平衡器来访问DocumentServer。 
-如果您使用外部TLS终止，并且在k8s集群中有多个WEB应用程序，则使用此类型。您可以使用一组入口实例和一个负载均衡器。它可以优化入口点性能并减少您的集群付款，因为提供商可以为每个负载均衡器收取费用。
+This type of exposure has more overheads of performance compared with exposure via service, it also creates a loadbalancer to get access to DocumentServer. 
+Use this type if you use external TLS termination and when you have several WEB applications in the k8s cluster. You can use the one set of ingress instances and the one loadbalancer for those. It can optimize entry point performance and reduce your cluster payments, cause providers can charge a fee for each loadbalancer.
 
-部署文档服务器入口
+Deploy documentserver ingress
 
-``
+```bash
 $ kubectl apply -f ./ingresses/documentserver.yaml
 ```
 
-运行下一个命令以获取`documentserver`入口IP：
+Run next command to get `documentserver` ingress IP:
 
-``
-$ kubectl获取入口文档服务器-o jsonpath =“ {。status.loadBalancer.ingress [*]。ip}”
+```bash
+$ kubectl get ingress documentserver -o jsonpath="{.status.loadBalancer.ingress[*].ip}"
 ```
 
-之后，ONLYOFFICE DocumentServer可以从http：// DOCUMENTSERVER-INGRESS-IP /获取。
+After it ONLYOFFICE DocumentServer will be available at `http://DOCUMENTSERVER-INGRESS-IP/`.
 
-如果入口IP为空，请尝试获取`documentserver`入口主机名
+If ingress IP is empty try getting `documentserver` ingress hostname
 
-``
-kubectl获取入口文档服务器-o jsonpath =“ {。status.loadBalancer.ingress [*]。hostname}”
+```bash
+kubectl get ingress documentserver -o jsonpath="{.status.loadBalancer.ingress[*].hostname}"
 ```
 
-在这种情况下，只能在http：// DOCUMENTSERVER-INGRESS-HOSTNAME /中获得ONLYOFFICE DocumentServer。
+In this case ONLYOFFICE DocumentServer will be available at `http://DOCUMENTSERVER-INGRESS-HOSTNAME/`.
 
-#### 5.2.3通过HTTPS公开DocumentServer
+#### 5.2.3 Expose DocumentServer via HTTPS
 
-这种暴露类型为DocumentServer启用内部TLS终止。
+This type of exposure to enable internal TLS termination for DocumentServer.
 
-使用ssl证书创建`tls`秘密。
+Create `tls` secret with ssl certificate inside.
 
-将ssl证书和私钥放入“ tls.crt”和“ tls.key”文件中，然后运行：
+Put ssl certificate and private key into `tls.crt` and `tls.key` file and than run:
 
-``
-$ kubectl创建秘密的通用tls \
-  --from-file =。/ tls.crt \
-  --from-file =。/ tls.key
+```bash
+$ kubectl create secret generic tls \
+  --from-file=./tls.crt \
+  --from-file=./tls.key
 ```
 
-打开`。/ ingresses / documentserver-ssl.yaml`并输入域名，而不是`example.com`。
+Open `./ingresses/documentserver-ssl.yaml` and type your domain name instead of `example.com`
 
-部署文档服务器入口
+Deploy documentserver ingress
 
-``
+```bash
 $ kubectl apply -f ./ingresses/documentserver-ssl.yaml
 ```
 
-运行下一个命令以获取`documentserver`入口IP：
+Run next command to get `documentserver` ingress IP:
 
-``
-$ kubectl获取入口文档服务器-o jsonpath =“ {。status.loadBalancer.ingress [*]。ip}”
+```bash
+$ kubectl get ingress documentserver -o jsonpath="{.status.loadBalancer.ingress[*].ip}"
 ```
 
-如果入口IP为空，请尝试获取`documentserver`入口主机名
+If ingress IP is empty try getting `documentserver` ingress hostname
 
-``
-kubectl获取入口文档服务器-o jsonpath =“ {。status.loadBalancer.ingress [*]。hostname}”
+```bash
+kubectl get ingress documentserver -o jsonpath="{.status.loadBalancer.ingress[*].hostname}"
 ```
 
-通过DNS提供商将`documentserver`入口IP或主机名与您的域名相关联。
+Associate `documentserver` ingress IP or hostname with your domain name through your DNS provider.
 
-之后，仅在https：//您的域名/上将提供ONOFFOFFICE DocumentServer。
+After it ONLYOFFICE DocumentServer will be available at `https://your-domain-name/`.
 
-### 6.更新ONLYOFFICE DocumentServer
-#### 6.1准备更新
+### 6. Update ONLYOFFICE DocumentServer
+#### 6.1 Preparing for update
 
-下一个脚本创建一个作业，该作业将关闭服务，清除缓存文件并清除数据库中的表。
-下载ONLYOFFICE DocumentServer数据库脚本以进行数据库清理：
+The next script creates a job, which shuts down the service, clears the cache files and clears tables in database.
+Download ONLYOFFICE DocumentServer database script for database cleaning:
 
-``
+```bash
 $ wget https://raw.githubusercontent.com/ONLYOFFICE/server/master/schema/postgresql/removetbl.sql
 ```
 
-从中创建配置图：
+Create a config map from it:
 
-``
-$ kubectl创建配置映射remove-db-scripts --from-file =。/ removetbl.sql
+```bash
+$ kubectl create configmap remove-db-scripts --from-file=./removetbl.sql
 ```
 
-运行作业：
+Run the job:
 
-``
+```bash
 $ kubectl apply -f ./jobs/prepare4update.yaml
 ```
 
-成功运行后，作业会自动终止其吊舱，但您必须手动清理作业本身：
+After successful run job automaticly terminates its pod, but you have to clean the job itself manually:
 
-``
-$ kubectl删除作业prepare4update
+```bash
+$ kubectl delete job prepare4update
 ```
-#### 6.2更新DocumentServer映像
+#### 6.2 Update DocumentServer images
 
-更新部署映像：
+Update deployment images:
 ```
-$ kubectl设置映像部署/拼写检查器\
-  spellchecker = onlyoffice / 4testing-ds-spellchecker：DOCUMENTSERVER_VERSION
+$ kubectl set image deployment/spellchecker \
+  spellchecker=onlyoffice/4testing-ds-spellchecker:DOCUMENTSERVER_VERSION
 
-$ kubectl设置映像部署/转换器\
-  converter = onlyoffice / 4testing-ds-converter：DOCUMENTSERVER_VERSION
+$ kubectl set image deployment/converter \
+  converter=onlyoffice/4testing-ds-converter:DOCUMENTSERVER_VERSION
 
-$ kubectl设置映像部署/ docservice \
-  docservice = onlyoffice / 4testing-ds-docservice：DOCUMENTSERVER_VERSION \
-  proxy = onlyoffice / 4testing-ds-proxy：DOCUMENTSERVER_VERSION
+$ kubectl set image deployment/docservice \
+  docservice=onlyoffice/4testing-ds-docservice:DOCUMENTSERVER_VERSION \
+  proxy=onlyoffice/4testing-ds-proxy:DOCUMENTSERVER_VERSION
 ```
-DOCUMENTSERVER_VERSION是ONLYOFFICE DocumentServer的docker映像的新版本。
+`DOCUMENTSERVER_VERSION` is the new version of docker images for ONLYOFFICE DocumentServer.
